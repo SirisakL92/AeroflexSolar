@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEROFLEX Solar Plant Dashboard</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root {
+    --bg:#f8f7f4;--bg-card:#ffffff;--bg-metric:#f3f2ee;
+    --text-primary:#1a1a1a;--text-secondary:#6b6b6b;--text-tertiary:#9b9b9b;
+    --border:rgba(0,0,0,0.08);
+    --blue:#378ADD;--blue-light:rgba(55,138,221,0.12);
+    --teal:#1D9E75;--teal-light:rgba(29,158,117,0.10);
+    --purple:#7F77DD;--purple-light:rgba(127,119,221,0.10);
+    --amber:#EF9F27;--amber-light:rgba(239,159,39,0.12);
+    --red:#E24B4A;--red-light:rgba(226,75,74,0.10);
+    --coral:#D85A30;--coral-light:rgba(216,90,48,0.10);
+    --green:#639922;--green-light:rgba(99,153,34,0.10);
+    --gray-mid:#73726c;
+    --radius:10px;--radius-lg:14px;
+  }
+  @media(prefers-color-scheme:dark){:root{
+    --bg:#1a1a1a;--bg-card:#242424;--bg-metric:#2a2a2a;
+    --text-primary:#e8e8e8;--text-secondary:#a0a0a0;--text-tertiary:#707070;
+    --border:rgba(255,255,255,0.08);
+  }}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Inter',sans-serif;background:var(--bg);color:var(--text-primary);line-height:1.6;padding:2rem;max-width:1200px;margin:0 auto}
+  .header{display:flex;align-items:center;gap:14px;margin-bottom:1.5rem;flex-wrap:wrap}
+  .header-icon{width:48px;height:48px;background:var(--blue-light);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--blue)}
+  .header h1{font-size:22px;font-weight:500}
+  .header-sub{font-size:13px;color:var(--text-secondary)}
+  .badge{font-size:11px;padding:4px 12px;border-radius:var(--radius);background:var(--blue-light);color:var(--blue);font-weight:500;margin-left:auto}
+
+  /* Upload */
+  .upload-section{background:var(--bg-card);border:2px dashed var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1.5rem;text-align:center;transition:border-color 0.2s,background 0.2s;cursor:pointer;position:relative}
+  .upload-section:hover,.upload-section.drag-over{border-color:var(--blue);background:var(--blue-light)}
+  .upload-section input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .upload-icon{font-size:32px;color:var(--text-tertiary);margin-bottom:6px}
+  .upload-text{font-size:14px;color:var(--text-secondary)}
+  .upload-text strong{color:var(--blue);font-weight:500}
+  .upload-hint{font-size:12px;color:var(--text-tertiary);margin-top:4px}
+  .upload-status{font-size:13px;margin-top:8px;padding:6px 14px;border-radius:var(--radius);display:none}
+  .upload-status.success{display:inline-block;background:var(--teal-light);color:var(--teal)}
+  .upload-status.error{display:inline-block;background:var(--red-light);color:var(--red)}
+
+  /* KPI */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:1.5rem}
+  .kpi{background:var(--bg-metric);border-radius:var(--radius);padding:1rem 1.1rem}
+  .kpi-label{font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:5px;margin-bottom:4px}
+  .kpi-val{font-size:22px;font-weight:500}
+  .kpi-unit{font-size:12px;color:var(--text-secondary);font-weight:400}
+
+  /* Section */
+  .section{background:var(--bg-card);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:1.25rem}
+  .section-title{font-size:15px;font-weight:500;display:flex;align-items:center;gap:8px;margin-bottom:1rem}
+  .section-title i{font-size:18px;color:var(--text-secondary)}
+  .row2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.25rem;margin-bottom:1.25rem}
+  .row2 .section{margin-bottom:0}
+  .chart-wrap{position:relative;width:100%}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:10px;font-size:12px;color:var(--text-secondary)}
+  .legend-item{display:flex;align-items:center;gap:5px}
+  .legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+  .tab-bar{display:flex;gap:4px;margin-bottom:12px}
+  .tab-btn{background:transparent;border:0.5px solid var(--border);border-radius:var(--radius);padding:5px 14px;font-size:12px;color:var(--text-secondary);cursor:pointer;font-family:inherit;transition:all 0.15s}
+  .tab-btn:hover{background:var(--bg-metric)}
+  .tab-btn.active{background:var(--blue-light);color:var(--blue);border-color:var(--blue)}
+
+  /* Loss */
+  .loss-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:1.25rem}
+  .loss-card{border-radius:var(--radius);padding:1rem 1.1rem;position:relative;overflow:hidden}
+  .loss-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
+  .loss-card.system{background:var(--amber-light)}.loss-card.system::before{background:var(--amber)}
+  .loss-card.revenue{background:var(--red-light)}.loss-card.revenue::before{background:var(--red)}
+  .loss-card.capture{background:var(--teal-light)}.loss-card.capture::before{background:var(--teal)}
+  .loss-card-label{font-size:12px;color:var(--text-secondary);margin-bottom:4px;display:flex;align-items:center;gap:5px}
+  .loss-card-val{font-size:20px;font-weight:500}
+  .loss-card-sub{font-size:11px;color:var(--text-tertiary);margin-top:2px}
+
+  /* Table */
+  .loss-detail-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:1rem}
+  .loss-detail-table th{text-align:left;font-weight:500;font-size:12px;color:var(--text-secondary);padding:8px 10px;border-bottom:0.5px solid var(--border)}
+  .loss-detail-table td{padding:7px 10px;border-bottom:0.5px solid var(--border);color:var(--text-primary)}
+  .loss-detail-table td:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
+  .loss-detail-table tr:last-child td{border-bottom:none;font-weight:500}
+  .loss-detail-table tbody tr:hover{background:var(--bg-metric)}
+  .bar-cell{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+  .bar-mini{height:6px;border-radius:3px;min-width:2px}
+
+  .footer{text-align:center;padding:1.5rem 0 0.5rem;font-size:12px;color:var(--text-tertiary)}
+  @media print{body{padding:1rem}.section{break-inside:avoid}.upload-section{display:none}}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-icon"><i class="ti ti-solar-panel"></i></div>
+  <div>
+    <h1 id="headerTitle">Plant report — AEROFLEX 2025</h1>
+    <div class="header-sub" id="headerSub">Capacity: 3,957.12 kWp &middot; Jan – Dec 2025</div>
+  </div>
+  <span class="badge">Solar PV</span>
+</div>
+
+<!-- File Upload -->
+<div class="upload-section" id="uploadArea">
+  <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.tsv">
+  <div class="upload-icon"><i class="ti ti-upload"></i></div>
+  <div class="upload-text">ลากไฟล์มาวางที่นี่ หรือ <strong>คลิกเลือกไฟล์</strong></div>
+  <div class="upload-hint">รองรับ .xlsx, .xls, .csv — โครงสร้างคอลัมน์เหมือน Plant Report</div>
+  <div class="upload-status" id="uploadStatus"></div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid" id="kpiGrid">
+  <div class="kpi"><div class="kpi-label"><i class="ti ti-bolt" style="font-size:15px"></i> PV yield รวม</div><div class="kpi-val" id="kpiYield">4,155 <span class="kpi-unit">MWh</span></div></div>
+  <div class="kpi"><div class="kpi-label"><i class="ti ti-currency-baht" style="font-size:15px"></i> รายได้รวม</div><div class="kpi-val" id="kpiRevenue">16.68 <span class="kpi-unit">ล้านบาท</span></div></div>
+  <div class="kpi"><div class="kpi-label"><i class="ti ti-gauge" style="font-size:15px"></i> PR เฉลี่ย</div><div class="kpi-val" id="kpiPR">65.5<span class="kpi-unit">%</span></div></div>
+  <div class="kpi"><div class="kpi-label"><i class="ti ti-leaf" style="font-size:15px"></i> CO₂ ลดได้</div><div class="kpi-val" id="kpiCO2">2,017 <span class="kpi-unit">ตัน</span></div></div>
+</div>
+
+<!-- Loss Summary -->
+<div class="section" id="lossSection" style="border-left:3px solid var(--red)">
+  <div class="section-title"><i class="ti ti-alert-triangle" style="color:var(--red)"></i> สรุปการสูญเสียพลังงาน (Loss summary)</div>
+  <div class="loss-grid" id="lossCards"></div>
+  <div class="row2" style="margin-bottom:0">
+    <div>
+      <div style="font-size:13px;font-weight:500;margin-bottom:8px"><i class="ti ti-chart-bar" style="font-size:15px;color:var(--text-secondary)"></i> System loss รายเดือน (kWh)</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="lossBarChart"></canvas></div>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:500;margin-bottom:8px"><i class="ti ti-chart-donut" style="font-size:15px;color:var(--text-secondary)"></i> สัดส่วน loss ต่อ theoretical yield</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="lossPie"></canvas></div>
+    </div>
+  </div>
+  <table class="loss-detail-table">
+    <thead><tr><th>เดือน</th><th>System loss (kWh)</th><th>System loss (฿)</th><th>สัดส่วน loss / PV yield</th></tr></thead>
+    <tbody id="lossTableBody"></tbody>
+  </table>
+</div>
+
+<!-- Production Chart -->
+<div class="section">
+  <div class="section-title"><i class="ti ti-chart-bar"></i> การผลิตพลังงานรายเดือน</div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchYield('pv',this)">PV yield</button>
+    <button class="tab-btn" onclick="switchYield('inv',this)">Inverter yield</button>
+    <button class="tab-btn" onclick="switchYield('theory',this)">Theoretical</button>
+  </div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span> Actual</span>
+    <span class="legend-item"><span class="legend-dot" style="background:rgba(55,138,221,0.2)"></span> Theoretical</span>
+  </div>
+  <div class="chart-wrap" style="height:300px"><canvas id="yieldChart"></canvas></div>
+</div>
+
+<!-- Revenue & PR -->
+<div class="row2">
+  <div class="section">
+    <div class="section-title"><i class="ti ti-trending-up"></i> รายได้รายเดือน (฿)</div>
+    <div class="chart-wrap" style="height:240px"><canvas id="revenueChart"></canvas></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><i class="ti ti-gauge"></i> Performance ratio (%)</div>
+    <div class="chart-wrap" style="height:240px"><canvas id="prChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Irradiation & Loss -->
+<div class="row2">
+  <div class="section">
+    <div class="section-title"><i class="ti ti-sun"></i> Global irradiation & sun hours</div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--amber)"></span> Irradiation (kWh/m²)</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--teal)"></span> Sun hours (H)</span>
+    </div>
+    <div class="chart-wrap" style="height:240px"><canvas id="irradChart"></canvas></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><i class="ti ti-plug-off"></i> System loss รายเดือน (kWh vs ฿)</div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--red)"></span> Loss (kWh)</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--amber)"></span> Loss (฿)</span>
+    </div>
+    <div class="chart-wrap" style="height:240px"><canvas id="exportLossChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Consumption -->
+<div class="section">
+  <div class="section-title"><i class="ti ti-arrows-split"></i> สัดส่วนการใช้พลังงาน — consumption vs self-consumption</div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span> Total consumption</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--teal)"></span> Self-consumption (from PV)</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--gray-mid)"></span> Import (from grid)</span>
+  </div>
+  <div class="chart-wrap" style="height:280px"><canvas id="consumeChart"></canvas></div>
+</div>
+
+<div class="footer" id="footerText">
+  <i class="ti ti-info-circle" style="font-size:14px;vertical-align:-2px"></i>
+  Plant Report AEROFLEX 2025 &middot; Generated from Excel data
+</div>
+
+<script>
+// ===================== DEFAULT DATA (2025) =====================
+const DEFAULT_DATA = {
+  title: 'AEROFLEX',
+  year: '2025',
+  capacity: 3957.12,
+  months: ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'],
+  monthsFull: ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'],
+  pv:   [409466.45,334111.43,402620.20,337025.61,298079.41,392510.48,384665.62,363315.20,303927.37,312197.69,323092.57,294485.26],
+  inv:  [409466.45,334111.43,402620.20,337025.61,316716.15,392510.48,384665.62,393299.50,313302.60,333795.99,323092.57,304701.53],
+  theo: [625346.971,479074.229,612554.482,576939.302,464499.936,574378.166,553337.280,610439.621,485751.869,496349.256,500555.894,512735.030],
+  rev:  [1659009.51,1352381.61,1613044.99,1328703.97,1229620.60,1544326.59,1498806.68,1525113.03,1213906.37,1300092.94,1266451.30,1151335.01],
+  pr:   [65.478,69.741,65.728,58.416,68.184,68.337,69.517,64.429,64.498,67.250,64.547,59.427],
+  irrad:[158.031,121.066,154.798,145.798,117.383,145.151,139.833,154.264,122.754,125.432,126.495,129.573],
+  sunH: [318.167,289.167,333.167,326.917,330.083,334.583,344.500,338.083,312.917,308.583,297.333,277.833],
+  lossKwh:  [29919.009,15508.12,48780.031,98944.79,40908.714,30717.755,46404.602,64320.093,53950.918,51878.549,71283.88,91238.071],
+  lossBaht: [123340.11,64442.542,200159.039,403160.658,167382.12,127328.626,191677.614,264696.714,220897.273,209627.945,290223.379,374160.732],
+  consumption: [1494931.87,1476763.46,1576464.80,1332916.49,1375653.56,1420027.33,1534091.15,1417299.80,1391944.54,1415048.66,1370948.27,1114863.28],
+  selfCon:     [409434.53,334096.20,402577.82,336976.14,298049.21,392455.61,384618.39,363253.59,303881.06,312169.93,323064.49,293772.98],
+  imp:         [1085497.34,1142667.26,1173886.98,995940.35,1124349.95,1027571.72,1149472.76,1121740.80,1117675.52,1196619.77,1047883.78,842944.51],
+  co2:         [194.497,158.703,191.245,160.087,150.44,186.442,182.716,186.817,148.819,158.553,153.469,144.733]
+};
+
+// ===================== THEME =====================
+const isDark = matchMedia('(prefers-color-scheme:dark)').matches;
+const gridC = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+const txtC  = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)';
+const fmtK  = v => Math.round(v/1000).toLocaleString() + 'k';
+
+const base = () => ({
+  responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{display:false}},
+  scales:{
+    x:{grid:{display:false},ticks:{font:{size:11},color:txtC}},
+    y:{grid:{color:gridC},ticks:{font:{size:11},color:txtC}}
+  }
+});
+
+// ===================== CHART INSTANCES =====================
+let charts = {};
+let currentData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+let currentYieldMode = 'pv';
+
+function sumArr(a){ return a.reduce((s,v) => s + (Number(v)||0), 0); }
+
+// ===================== RENDER ALL =====================
+function renderAll(D) {
+  currentData = D;
+  const totalPV   = sumArr(D.pv);
+  const totalTheo = sumArr(D.theo);
+  const totalRev  = sumArr(D.rev);
+  const avgPR     = sumArr(D.pr) / D.pr.length;
+  const totalCO2  = sumArr(D.co2);
+  const totalLossKwh  = sumArr(D.lossKwh);
+  const totalLossBaht = sumArr(D.lossBaht);
+  const captureRatio  = totalTheo > 0 ? (totalPV / totalTheo * 100) : 0;
+
+  // Header
+  document.getElementById('headerTitle').textContent = 'Plant report — ' + D.title + ' ' + D.year;
+  document.getElementById('headerSub').textContent = 'Capacity: ' + D.capacity.toLocaleString() + ' kWp · ' + D.months[0] + ' – ' + D.months[D.months.length-1] + ' ' + D.year;
+
+  // KPIs
+  document.getElementById('kpiYield').innerHTML   = Math.round(totalPV/1000).toLocaleString() + ' <span class="kpi-unit">MWh</span>';
+  document.getElementById('kpiRevenue').innerHTML  = (totalRev/1e6).toFixed(2) + ' <span class="kpi-unit">ล้านบาท</span>';
+  document.getElementById('kpiPR').innerHTML       = avgPR.toFixed(1) + '<span class="kpi-unit">%</span>';
+  document.getElementById('kpiCO2').innerHTML      = Math.round(totalCO2).toLocaleString() + ' <span class="kpi-unit">ตัน</span>';
+
+  // Loss cards
+  document.getElementById('lossCards').innerHTML = `
+    <div class="loss-card system">
+      <div class="loss-card-label"><i class="ti ti-arrow-down-right" style="font-size:14px"></i> System loss</div>
+      <div class="loss-card-val">${Math.round(totalLossKwh/1000).toLocaleString()} <span class="kpi-unit">MWh</span></div>
+      <div class="loss-card-sub">Loss Due to Export Limitation</div>
+    </div>
+    <div class="loss-card revenue">
+      <div class="loss-card-label"><i class="ti ti-coin-off" style="font-size:14px"></i> รายได้ที่สูญเสีย</div>
+      <div class="loss-card-val">${(totalLossBaht/1e6).toFixed(2)} <span class="kpi-unit">ล้านบาท</span></div>
+      <div class="loss-card-sub">จาก system loss</div>
+    </div>
+    <div class="loss-card capture">
+      <div class="loss-card-label"><i class="ti ti-percentage" style="font-size:14px"></i> Capture ratio</div>
+      <div class="loss-card-val">${captureRatio.toFixed(1)}<span class="kpi-unit">%</span></div>
+      <div class="loss-card-sub">PV yield / theoretical yield</div>
+    </div>`;
+
+  // Loss table
+  const maxLoss = Math.max(...D.lossKwh);
+  let thtml = '';
+  for (let i = 0; i < D.months.length; i++) {
+    const pct = D.pv[i] > 0 ? (D.lossKwh[i] / D.pv[i] * 100).toFixed(1) : '0.0';
+    const barW = maxLoss > 0 ? Math.round(D.lossKwh[i] / maxLoss * 60) : 0;
+    thtml += `<tr>
+      <td>${D.monthsFull[i]}</td>
+      <td>${Math.round(D.lossKwh[i]).toLocaleString()}</td>
+      <td>${Math.round(D.lossBaht[i]).toLocaleString()}</td>
+      <td><div class="bar-cell">${pct}% <span class="bar-mini" style="width:${barW}px;background:var(--red)"></span></div></td>
+    </tr>`;
+  }
+  thtml += `<tr style="background:var(--bg-metric)">
+    <td>รวมทั้งปี</td>
+    <td>${Math.round(totalLossKwh).toLocaleString()}</td>
+    <td>${Math.round(totalLossBaht).toLocaleString()}</td>
+    <td><div class="bar-cell">${totalPV > 0 ? (totalLossKwh/totalPV*100).toFixed(1) : '0.0'}%</div></td>
+  </tr>`;
+  document.getElementById('lossTableBody').innerHTML = thtml;
+
+  // Footer
+  document.getElementById('footerText').innerHTML = '<i class="ti ti-info-circle" style="font-size:14px;vertical-align:-2px"></i> Plant Report ' + D.title + ' ' + D.year;
+
+  // ---- CHARTS ----
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+
+  // Loss bar
+  charts.lossBar = new Chart(document.getElementById('lossBarChart'), {
+    type:'bar',
+    data:{ labels:D.months, datasets:[{ label:'System loss', data:D.lossKwh, backgroundColor:'#EF9F27', borderRadius:3, barPercentage:0.6 }] },
+    options:{...base(), plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'System loss: '+Math.round(ctx.raw).toLocaleString()+' kWh'}}}, scales:{...base().scales, y:{...base().scales.y, ticks:{...base().scales.y.ticks, callback:v=>fmtK(v)}}}}
+  });
+
+  // Loss pie
+  charts.lossPie = new Chart(document.getElementById('lossPie'), {
+    type:'doughnut',
+    data:{ labels:['PV yield (ผลิตได้)','System loss'], datasets:[{ data:[Math.round(totalPV), Math.round(totalLossKwh)], backgroundColor:['#378ADD','#EF9F27'], borderWidth:0, borderRadius:2 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'55%', plugins:{ legend:{position:'bottom',labels:{font:{size:11},color:txtC,padding:12,usePointStyle:true,pointStyleWidth:10}}, tooltip:{callbacks:{label:ctx=>{ const t=ctx.dataset.data.reduce((a,b)=>a+b,0); return ctx.label+': '+Math.round(ctx.raw).toLocaleString()+' kWh ('+(ctx.raw/t*100).toFixed(1)+'%)'; }}} } }
+  });
+
+  // Yield
+  charts.yield = new Chart(document.getElementById('yieldChart'), {
+    type:'bar',
+    data:{ labels:D.months, datasets:[
+      {label:'Actual',data:[...D.pv],backgroundColor:'#378ADD',borderRadius:4,barPercentage:0.55},
+      {label:'Theoretical',data:D.theo,backgroundColor:'rgba(55,138,221,0.15)',borderRadius:4,barPercentage:0.55}
+    ]},
+    options:{...base(), plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+Math.round(ctx.raw).toLocaleString()+' kWh'}}}, scales:{...base().scales,y:{...base().scales.y,ticks:{...base().scales.y.ticks,callback:v=>fmtK(v)}}}}
+  });
+  currentYieldMode = 'pv';
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+
+  // Revenue
+  charts.revenue = new Chart(document.getElementById('revenueChart'), {
+    type:'line',
+    data:{labels:D.months,datasets:[{data:D.rev,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:0.35,pointRadius:3,pointBackgroundColor:'#1D9E75',borderWidth:2}]},
+    options:{...base(),plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'฿'+Math.round(ctx.raw).toLocaleString()}}},scales:{...base().scales,y:{...base().scales.y,ticks:{...base().scales.y.ticks,callback:v=>(v/1e6).toFixed(1)+'M'}}}}
+  });
+
+  // PR
+  charts.pr = new Chart(document.getElementById('prChart'), {
+    type:'line',
+    data:{labels:D.months,datasets:[{data:D.pr,borderColor:'#7F77DD',backgroundColor:'rgba(127,119,221,0.08)',fill:true,tension:0.35,pointRadius:3,pointBackgroundColor:'#7F77DD',borderWidth:2}]},
+    options:{...base(),plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.raw.toFixed(1)+'%'}}},scales:{...base().scales,y:{...base().scales.y,min:Math.floor(Math.min(...D.pr)-5),max:Math.ceil(Math.max(...D.pr)+5),ticks:{...base().scales.y.ticks,callback:v=>v+'%'}}}}
+  });
+
+  // Irradiation
+  charts.irrad = new Chart(document.getElementById('irradChart'), {
+    type:'bar',
+    data:{labels:D.months,datasets:[
+      {label:'Irradiation',data:D.irrad,backgroundColor:'#EF9F27',borderRadius:3,barPercentage:0.45,yAxisID:'y'},
+      {label:'Sun hours',data:D.sunH,type:'line',borderColor:'#1D9E75',pointBackgroundColor:'#1D9E75',pointRadius:3,borderWidth:2,tension:0.3,yAxisID:'y1'}
+    ]},
+    options:{...base(),plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.raw.toFixed(1)}}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:txtC}},y:{position:'left',grid:{color:gridC},ticks:{font:{size:11},color:txtC}},y1:{position:'right',grid:{display:false},ticks:{font:{size:11},color:txtC}}}}
+  });
+
+  // Export loss detail
+  charts.exportLoss = new Chart(document.getElementById('exportLossChart'), {
+    type:'bar',
+    data:{labels:D.months,datasets:[
+      {label:'Loss kWh',data:D.lossKwh,backgroundColor:'#E24B4A',borderRadius:3,barPercentage:0.45,yAxisID:'y'},
+      {label:'Loss ฿',data:D.lossBaht,type:'line',borderColor:'#EF9F27',pointBackgroundColor:'#EF9F27',pointRadius:3,borderWidth:2,tension:0.3,yAxisID:'y1'}
+    ]},
+    options:{...base(),plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+Math.round(ctx.raw).toLocaleString()}}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:txtC}},y:{position:'left',grid:{color:gridC},ticks:{font:{size:11},color:txtC,callback:v=>fmtK(v)}},y1:{position:'right',grid:{display:false},ticks:{font:{size:11},color:txtC,callback:v=>fmtK(v)}}}}
+  });
+
+  // Consumption
+  charts.consume = new Chart(document.getElementById('consumeChart'), {
+    type:'bar',
+    data:{labels:D.months,datasets:[
+      {label:'Total consumption',data:D.consumption,backgroundColor:'rgba(55,138,221,0.15)',borderColor:'#378ADD',borderWidth:1,borderRadius:4,barPercentage:0.7},
+      {label:'Self-consumption',data:D.selfCon,backgroundColor:'rgba(29,158,117,0.65)',borderRadius:4,barPercentage:0.7},
+      {label:'Import',data:D.imp,backgroundColor:'rgba(115,114,108,0.25)',borderRadius:4,barPercentage:0.7}
+    ]},
+    options:{...base(),plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+Math.round(ctx.raw).toLocaleString()+' kWh'}}},scales:{...base().scales,y:{...base().scales.y,ticks:{...base().scales.y.ticks,callback:v=>fmtK(v)}}}}
+  });
+}
+
+// ===================== YIELD SWITCH =====================
+function switchYield(mode, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentYieldMode = mode;
+  const d = mode === 'pv' ? currentData.pv : mode === 'inv' ? currentData.inv : currentData.theo;
+  charts.yield.data.datasets[0].data = [...d];
+  charts.yield.update();
+}
+
+// ===================== FILE PARSING =====================
+const MONTH_NAMES_TH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const MONTH_SHORT_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+function getMonthIndex(val) {
+  if (!val) return -1;
+  const s = String(val).trim();
+  const m = s.match(/(\d{4})-(\d{2})/);
+  if (m) return parseInt(m[2], 10) - 1;
+  const m2 = s.match(/(\d{1,2})\/(\d{4})/);
+  if (m2) return parseInt(m2[1], 10) - 1;
+  return -1;
+}
+
+function findCol(headers, patterns) {
+  for (const p of patterns) {
+    const idx = headers.findIndex(h => h && h.toLowerCase().includes(p.toLowerCase()));
+    if (idx >= 0) return idx;
+  }
+  return -1;
+}
+
+function parseRows(rows) {
+  if (rows.length < 2) throw new Error('ไม่พบข้อมูลในไฟล์');
+
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const r = rows[i].map(v => String(v||'').toLowerCase());
+    if (r.some(c => c.includes('statistical') || c.includes('period') || c.includes('pv yield'))) { headerIdx = i; break; }
+  }
+
+  const headers = rows[headerIdx].map(v => String(v||''));
+  const dataRows = rows.slice(headerIdx + 1).filter(r => r.length > 1 && r[0] && String(r[0]).match(/\d/));
+
+  const col = {
+    period:  findCol(headers, ['Statistical Period','Period','เดือน']),
+    capacity: findCol(headers, ['Total String Capacity','Capacity']),
+    irrad:   findCol(headers, ['Global Irradiation','Irradiation']),
+    sunH:    findCol(headers, ['Sun Hours']),
+    temp:    findCol(headers, ['Temperature']),
+    theo:    findCol(headers, ['Theoretical Yield','Theoretical']),
+    pv:      findCol(headers, ['PV Yield']),
+    inv:     findCol(headers, ['Inverter Yield','Inverter']),
+    export:  findCol(headers, ['Export (kWh)','Export']),
+    import:  findCol(headers, ['Import (kWh)','Import']),
+    specE:   findCol(headers, ['Specific Energy']),
+    lossKwh: findCol(headers, ['Loss Due to Export Limitation (kWh)','Loss Due to Export Limitation(kWh)','Export Limitation (kWh)']),
+    lossBaht:findCol(headers, ['Loss Due to Export Limitation(฿)','Loss Due to Export Limitation (฿)','Export Limitation(฿)']),
+    consumption: findCol(headers, ['Consumption (kWh)','Consumption']),
+    selfCon: findCol(headers, ['Self-consumption','Self consumption']),
+    peakPow: findCol(headers, ['Peak Power']),
+    pr:      findCol(headers, ['Performance Ratio','PR']),
+    co2:     findCol(headers, ['CO₂ Avoided','CO2 Avoided','CO₂']),
+    coal:    findCol(headers, ['Standard Coal']),
+    rev:     findCol(headers, ['Revenue','Revenue (฿)'])
+  };
+
+  if (col.pv < 0) throw new Error('ไม่พบคอลัมน์ PV Yield');
+
+  const n = v => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
+  const D = { months:[], monthsFull:[], pv:[], inv:[], theo:[], rev:[], pr:[], irrad:[], sunH:[], lossKwh:[], lossBaht:[], consumption:[], selfCon:[], imp:[], co2:[], capacity:0, title:'', year:'' };
+
+  let detectedYear = '';
+  dataRows.forEach(r => {
+    const mi = getMonthIndex(r[col.period]);
+    if (mi < 0) return;
+    if (!detectedYear) { const ym = String(r[col.period]).match(/(\d{4})/); if (ym) detectedYear = ym[1]; }
+    D.months.push(MONTH_SHORT_TH[mi]);
+    D.monthsFull.push(MONTH_NAMES_TH[mi]);
+    D.pv.push(n(r[col.pv]));
+    D.inv.push(col.inv >= 0 ? n(r[col.inv]) : n(r[col.pv]));
+    D.theo.push(col.theo >= 0 ? n(r[col.theo]) : 0);
+    D.rev.push(col.rev >= 0 ? n(r[col.rev]) : 0);
+    D.pr.push(col.pr >= 0 ? n(r[col.pr]) : 0);
+    D.irrad.push(col.irrad >= 0 ? n(r[col.irrad]) : 0);
+    D.sunH.push(col.sunH >= 0 ? n(r[col.sunH]) : 0);
+    D.lossKwh.push(col.lossKwh >= 0 ? n(r[col.lossKwh]) : 0);
+    D.lossBaht.push(col.lossBaht >= 0 ? n(r[col.lossBaht]) : 0);
+    D.consumption.push(col.consumption >= 0 ? n(r[col.consumption]) : 0);
+    D.selfCon.push(col.selfCon >= 0 ? n(r[col.selfCon]) : 0);
+    D.imp.push(col.import >= 0 ? n(r[col.import]) : 0);
+    D.co2.push(col.co2 >= 0 ? n(r[col.co2]) : 0);
+  });
+
+  D.capacity = col.capacity >= 0 && dataRows[0] ? n(dataRows[0][col.capacity]) : 0;
+  D.year = detectedYear || new Date().getFullYear().toString();
+
+  return D;
+}
+
+function detectTitle(rows) {
+  for (let i = 0; i < Math.min(3, rows.length); i++) {
+    const v = String(rows[i][0] || '');
+    if (v.match(/plant report|report/i)) {
+      const name = v.replace(/plant report[_\s]*/i, '').replace(/[._]/g, ' ').trim();
+      return name || 'Solar Plant';
+    }
+  }
+  return 'Solar Plant';
+}
+
+// ===================== FILE UPLOAD HANDLER =====================
+const uploadArea = document.getElementById('uploadArea');
+const fileInput  = document.getElementById('fileInput');
+const statusEl   = document.getElementById('uploadStatus');
+
+function showStatus(msg, ok) {
+  statusEl.textContent = msg;
+  statusEl.className = 'upload-status ' + (ok ? 'success' : 'error');
+}
+
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => { e.preventDefault(); uploadArea.classList.remove('drag-over'); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => { if (e.target.files.length) processFile(e.target.files[0]); });
+
+function processFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'csv' || ext === 'tsv') {
+    Papa.parse(file, {
+      complete: result => {
+        try {
+          const D = parseRows(result.data);
+          D.title = file.name.replace(/\.[^.]+$/, '').replace(/[_]/g, ' ');
+          renderAll(D);
+          showStatus('✓ โหลดสำเร็จ: ' + file.name + ' (' + D.months.length + ' เดือน)', true);
+        } catch (err) { showStatus('✗ ' + err.message, false); }
+      },
+      error: err => showStatus('✗ อ่านไฟล์ไม่ได้: ' + err.message, false)
+    });
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        const D = parseRows(rows);
+        D.title = detectTitle(rows);
+        renderAll(D);
+        showStatus('✓ โหลดสำเร็จ: ' + file.name + ' (' + D.months.length + ' เดือน)', true);
+      } catch (err) { showStatus('✗ ' + err.message, false); }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    showStatus('✗ รองรับเฉพาะ .xlsx, .xls, .csv', false);
+  }
+}
+
+// ===================== INITIAL RENDER =====================
+renderAll(DEFAULT_DATA);
+</script>
+</body>
+</html>
